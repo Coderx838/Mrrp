@@ -1,0 +1,35 @@
+mrrp
+# fibonacci.mrrp : functions , recursions , loop , branching.
+trick fib(n){
+    purr n <= 1{
+        fetch n
+    }
+    hiss {
+        fetch fib(n-1) + fib(n-2)
+    }
+}
+
+meow "first 10 fibs:"
+zoomies i from 0 to 9{
+    meow fib(i)
+}
+
+meow "chase demo:"
+paw c = 0
+chase c < 3{
+    meow c
+    c = c + 1
+}
+
+meow "if-else demo:"
+paw n = 7
+purr n > 10{
+    meow "big"
+}
+hiss purr n > 5 {
+    meow "medium"
+
+}
+hiss {
+    meow "small"
+}

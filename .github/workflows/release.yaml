@@ -1,0 +1,227 @@
+name: Build and Release Mrrp
+
+# First professional release: v0.1.9
+# Release flow:
+#   Option A (manual): Actions tab -> "Build and Release Mrrp" -> Run workflow
+#                      (defaults to 0.1.9, creates GitHub Release v0.1.9)
+#   Option B (tag):    git tag v0.1.9; git push origin v0.1.9
+# Binaries are self-contained (PyInstaller --onefile, no Python needed).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version WITHOUT leading v (e.g. 0.1.9)"
+        required: true
+        default: "0.1.9"
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: mrrp
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  build:
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-amd64
+            bin_src: dist/mrrp.exe
+            bin_out: mrrp-windows-amd64.exe
+            archive: mrrp-0.1.9-windows-amd64.zip
+          - os: ubuntu-latest
+            platform: linux-amd64
+            bin_src: dist/mrrp
+            bin_out: mrrp-linux-amd64
+            archive: mrrp-0.1.9-linux-amd64.tar.gz
+          - os: macos-latest
+            platform: macos-arm64
+            bin_src: dist/mrrp
+            bin_out: mrrp-macos-arm64
+            archive: mrrp-0.1.9-macos-arm64.tar.gz
+          - os: macos-13
+            platform: macos-amd64
+            bin_src: dist/mrrp
+            bin_out: mrrp-macos-amd64
+            archive: mrrp-0.1.9-macos-amd64.tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VER="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${{ github.event.inputs.version }}" ]]; then
+            VER="${{ github.event.inputs.version }}"
+          else
+            VER="0.1.9"
+          fi
+          # strip accidental leading v
+          VER="${VER#v}"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${VER}" >> "$GITHUB_ENV"
+          echo "Resolved version: ${VER}"
+
+      - name: Install PyInstaller
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+
+      - name: Compile self-contained binary (no Python needed at runtime)
+        shell: bash
+        run: |
+          pyinstaller --onefile --name mrrp --console --clean --noconfirm mrrp.py
+          ls -lh dist/
+          if [ -f "dist/mrrp.exe" ]; then ls -lh dist/mrrp.exe; fi
+          if [ -f "dist/mrrp" ]; then ls -lh dist/mrrp; fi
+
+      - name: Smoke test binary (runs without python)
+        shell: bash
+        run: |
+          if [ -f "dist/mrrp.exe" ]; then BIN="dist/mrrp.exe"; else BIN="dist/mrrp"; fi
+          chmod +x "$BIN" || true
+          "$BIN" examples/hello.mrrp
+          "$BIN" examples/hello_world.mrrp
+          "$BIN" examples/fibonacci.mrrp
+          echo "smoke test OK"
+
+      - name: Stage portable package
+        shell: bash
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          mkdir -p pkg
+          if [ -f "dist/mrrp.exe" ]; then BIN="dist/mrrp.exe"; else BIN="dist/mrrp"; fi
+          cp "$BIN" "pkg/${{ matrix.bin_out }}"
+          cp README.md usage.txt mrrp.py pkg/ 2>/dev/null || true
+          cp -r examples pkg/ 2>/dev/null || true
+          ls -R pkg
+
+      - name: Make archive (linux / mac)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          ARCHIVE="$(echo '${{ matrix.archive }}' | sed "s/0\.1\.9/${VER}/")"
+          echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
+          tar -czvf "${ARCHIVE}" -C pkg .
+          ls -lh "${ARCHIVE}"
+
+      - name: Make archive (windows portable zip)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          ARCHIVE="mrrp-${VER}-windows-amd64.zip"
+          echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
+          powershell -NoProfile -Command "Compress-Archive -Path pkg\* -DestinationPath $env:ARCHIVE -Force"
+          ls -lh "${ARCHIVE}"
+
+      - name: Build Windows installer (NSIS, adds to PATH)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          export PATH="$PATH:/c/Program Files (x86)/NSIS"
+          makensis -VERSION
+          makensis "/DVERSION=${VER}" installer.nsi
+          ls -lh Mrrp-Setup-*.exe
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          retention-days: 30
+          path: |
+            ${{ env.ARCHIVE }}
+            pkg/${{ matrix.bin_out }}
+            Mrrp-Setup-*.exe
+
+  release:
+    name: publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VER="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${{ github.event.inputs.version }}" ]]; then
+            VER="${{ github.event.inputs.version }}"
+          else
+            VER="0.1.9"
+          fi
+          VER="${VER#v}"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${VER}" >> "$GITHUB_ENV"
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          merge-multiple: true
+
+      - name: Checksums + listing
+        shell: bash
+        run: |
+          ls -lhR artifacts/
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt || shasum -a 256 * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish Release v${{ steps.version.outputs.version }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Mrrp v${{ steps.version.outputs.version }} — the cat that remembers the future
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          body: |
+            ## Mrrp v${{ steps.version.outputs.version }} — first official release
+
+            Self-contained interpreter for `.mrrp` files. **No Python needed** — just download and run.
+
+            ### Install / run
+            **Windows (recommended):** download `Mrrp-Setup-${{ steps.version.outputs.version }}-windows-amd64.exe`, run it (adds `mrrp` to PATH), then:
+            ```
+            mrrp examples\hello_world.mrrp
+            ```
+            **Windows (portable):** unzip `mrrp-${{ steps.version.outputs.version }}-windows-amd64.zip`, then `mrrp-windows-amd64.exe examples\hello_world.mrrp`
+            **Linux:** `tar -xzf mrrp-${{ steps.version.outputs.version }}-linux-amd64.tar.gz` then `./mrrp-linux-amd64 examples/hello_world.mrrp`
+            **macOS (Apple Silicon):** `tar -xzf mrrp-${{ steps.version.outputs.version }}-macos-arm64.tar.gz` then `./mrrp-macos-arm64 examples/hello_world.mrrp`
+            **macOS (Intel):** `tar -xzf mrrp-${{ steps.version.outputs.version }}-macos-amd64.tar.gz` then `./mrrp-macos-amd64 examples/hello_world.mrrp`
+
+            > macOS/Gatekeeper: if blocked, run `xattr -d com.apple.quarantine ./mrrp-macos-*` once.
+
+            ### Try it
+            ```
+            mrrp examples/hello.mrrp
+            mrrp examples/hello_world.mrrp
+            mrrp examples/fibonacci.mrrp
+            ```
+
+            Verify downloads with `SHA256SUMS.txt`.
+          files: |
+            artifacts/*

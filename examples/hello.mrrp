@@ -1,0 +1,8 @@
+mrrp
+# hello.mrrp
+paw name = "mrrp"
+meow "hello, i am"
+meow name
+meow 2 + 3 * 4
+paw mood = "yum"
+meow mood

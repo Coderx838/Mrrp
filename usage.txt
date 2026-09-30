@@ -1,0 +1,150 @@
+~~~ Mrrp usage notes ~~~
+hey! this is just me explaining how mrrp works.
+yay cat have language now *mrrp*
+
+to run anything:
+  python mrrp.py yourfile.mrrp
+files always end with .mrrp
+or just type: python mrrp.py  and you get the little repl.
+
+--- the words ---
+
+mrrp
+  you put this on top of the file. its like saying "hey cat".
+  if you forget it, cat doesnt care. it still runs.
+
+meow <something>
+  this is print. thats it.
+  meow "hello"
+  meow 2 + 3
+  meow myToy
+
+paw <name> = <value>
+  this is how you make a toy (variable).
+  paw snacks = 5
+  you can also write: paw snacks is 5
+  if you forget the =, cat adds it for you.
+
+sniff <name>
+  this asks the hooman to type something.
+  sniff snack
+
+purr <condition> {
+  this is IF. cat purrs when happy (true).
+  purr snacks > 3 {
+    meow "yum"
+    }
+
+hiss {}
+  this is ELSE. cat hisses when grumpy.
+  put it after a purr block.
+
+hiss purr <condition> {
+  this is ELSE-IF. yes, double cat sound.
+  purr n > 10 {
+    meow "big"
+    }
+  hiss purr n > 5 {
+    meow "medium"
+    }
+  hiss {
+    meow "small"
+  }
+
+chase <condition> {
+  this is WHILE. cat chases its tail until tired.
+  paw n = 0
+  chase n < 3 {
+    meow n
+    n = n + 1
+  }
+
+zoomies <var> from <a> to <b> {
+  this is FOR. both ends included, thats friendlier.
+  zoomies i from 1 to 5 {
+    meow i
+  }
+  you can add step: zoomies i from 1 to 10 step 2 {
+
+trick <name>(a, b) {
+  this is FUNCTION. a trick the cat learned.
+  trick add(a, b) {
+    fetch a + b
+  }
+  meow add(2, 3)
+
+fetch <value>
+  this is RETURN. cat fetches the toy back.
+  only works inside a trick.
+
+--- time travel stuff (the cool part) ---
+
+bury <toy>
+  cat buries the toy in the time-hole to save it.
+  paw treasure = 999
+  bury treasure
+
+dig <toy>
+  cat digs it back up. the crazy bit:
+  you can dig BEFORE you bury, and it still works.
+  meow dig treasure
+  paw treasure = 999
+  bury treasure
+  -> prints 999 on the first line too. from the future!
+
+  you can also use it inside math:
+  meow dig treasure + 1
+
+prophecy <toy> will be <value>
+  you tell the cat what the future will be.
+  prophecy dinner will be "tuna"
+  now "dinner" is tuna, now AND in the future.
+
+prophecy <toy>
+  just peeks at the future.
+  meow prophecy dinner
+
+flashback <toy>
+  goes back to what the toy was before.
+  paw mood = "sleepy"
+  paw mood = "zoomies"
+  flashback mood
+  meow mood   -> sleepy again
+
+lives
+  cat tells you how many of its 9 lives are left,
+  plus what is buried and what it saw in the future.
+
+rewind
+  resets EVERYTHING to the very first values.
+  like waking up from a nap.
+
+nap
+  does nothing. cat naps. useful as a placeholder.
+
+--- tiny things ---
+
+yum / yuck
+  true and false. cat words.
+  true / false also work if you forget.
+  paw happy = yum
+
+math: + - * / %
+compare: == != < > <= >=
+  (if you type = in a purr, cat knows you meant ==)
+logic: and or not
+
+comments:
+  # i am a note
+  // me too
+
+---- the never crashing stuff(why is never yells at you) ----
+
+- typos get fixed: meooow becomes meow
+- wrong toy names get guessed: tream -> treasure
+- missing " or ) or } get closed by the tail
+- unknown toy becomes 0
+- 10 / 0 does NOT crash. cat loses 1 life and keeps going.
+- any confusing line becomes a nap, never an error.
+
+thats all. go pet the cat. *mrrp*

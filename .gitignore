@@ -1,0 +1,30 @@
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+
+# pyinstaller (workflow builds these fresh)
+build/
+dist/
+*.spec
+pkg/
+artifacts/
+
+# release outputs (uploaded to github releases, don't commit)
+mrrp-*.tar.gz
+mrrp-*.zip
+Mrrp-Setup-*.exe
+SHA256SUMS.txt
+
+# os / editors
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+.env
