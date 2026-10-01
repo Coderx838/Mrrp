@@ -25,6 +25,7 @@ ShowUnInstDetails show
 !include "StrFunc.nsh"
 ${StrStr}
 ${StrRep}
+${UnStrRep}
 
 !define MUI_ABORTWARNING
 !insertmacro MUI_PAGE_WELCOME
@@ -90,9 +91,9 @@ Section "Uninstall"
 
   ; Best-effort PATH cleanup: "$INSTDIR;" -> "" then ";$INSTDIR" -> "" then "$INSTDIR" -> ""
   ReadRegStr $0 HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "Path"
-  ${StrRep} $1 "$0" "$INSTDIR;" ""
-  ${StrRep} $2 "$1" ";$INSTDIR" ""
-  ${StrRep} $3 "$2" "$INSTDIR" ""
+  ${UnStrRep} $1 "$0" "$INSTDIR;" ""
+  ${UnStrRep} $2 "$1" ";$INSTDIR" ""
+  ${UnStrRep} $3 "$2" "$INSTDIR" ""
   WriteRegExpandStr HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "Path" "$3"
   SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
 SectionEnd
