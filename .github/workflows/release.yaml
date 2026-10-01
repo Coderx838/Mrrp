@@ -140,6 +140,7 @@ jobs:
         run: |
           VER="${{ steps.version.outputs.version }}"
           export PATH="$PATH:/c/Program Files (x86)/NSIS"
+          export MSYS_NO_PATHCONV=1
           makensis -VERSION
           makensis "/DVERSION=${VER}" installer.nsi
           ls -lh Mrrp-Setup-*.exe
