@@ -1,11 +1,6 @@
 name: Build and Release Mrrp
 
-# First professional release: v0.1.9
-# Release flow:
-#   Option A (manual): Actions tab -> "Build and Release Mrrp" -> Run workflow
-#                      (defaults to 0.1.9, creates GitHub Release v0.1.9)
-#   Option B (tag):    git tag v0.1.9; git push origin v0.1.9
-# Binaries are self-contained (PyInstaller --onefile, no Python needed).
+# workflow for the bundling of Mrrp via pyinstaller.
 
 on:
   push:
@@ -132,7 +127,7 @@ jobs:
           VER="${{ steps.version.outputs.version }}"
           ARCHIVE="mrrp-${VER}-windows-amd64.zip"
           echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
-          powershell -NoProfile -Command "Compress-Archive -Path pkg\* -DestinationPath $env:ARCHIVE -Force"
+          powershell -NoProfile -Command "Compress-Archive -Path 'pkg\*' -DestinationPath '${ARCHIVE}' -Force"
           ls -lh "${ARCHIVE}"
 
       - name: Build Windows installer (NSIS, adds to PATH)
