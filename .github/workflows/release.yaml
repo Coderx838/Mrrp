@@ -43,11 +43,6 @@ jobs:
             bin_src: dist/mrrp
             bin_out: mrrp-macos-arm64
             archive: mrrp-0.1.9-macos-arm64.tar.gz
-          - os: macos-13
-            platform: macos-amd64
-            bin_src: dist/mrrp
-            bin_out: mrrp-macos-amd64
-            archive: mrrp-0.1.9-macos-amd64.tar.gz
 
     steps:
       - name: Checkout
