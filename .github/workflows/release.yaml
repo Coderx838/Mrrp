@@ -130,6 +130,10 @@ jobs:
           powershell -NoProfile -Command "Compress-Archive -Path 'pkg\*' -DestinationPath '${ARCHIVE}' -Force"
           ls -lh "${ARCHIVE}"
 
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        run: choco install nsis -y
+
       - name: Build Windows installer (NSIS, adds to PATH)
         if: runner.os == 'Windows'
         shell: bash
