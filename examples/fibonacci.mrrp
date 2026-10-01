@@ -5,7 +5,7 @@ trick fib(n){
         fetch n
     }
     hiss {
-        fetch fib(n-1) + fib(n-2)
+        fetch fib(n - 1) + fib(n - 2)
     }
 }
 
