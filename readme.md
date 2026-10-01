@@ -14,3 +14,20 @@ python mrrp.py
 
 (*If you want to install the language on you computer just grab the executable from release section, it runs without python yay!!*)
 
+# *Screenshot :*
+![alt text](image-1.png)
+
+(*This is Mrrp in terminal yeah its first mrrp program created in this world yay!!*)
+
+
+# *Usage*
+
+(*For usage guide see [usage guide](usage.txt)*)
+(*It covers all you need to know about the Mrrp to make your first caty program using it.*) 
+
+(*I left some examples in /examples, go try them!! mrrrrrrp* )
+
+
+-------------------------------------------------------------------------------------------------------------------
+*Built with lots of purrs , tuna for [hackclub ysws](https://crescent.hackclub.com/) :3.*
+
