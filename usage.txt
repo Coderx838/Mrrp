@@ -122,6 +122,63 @@ rewind
 nap
   does nothing. cat naps. useful as a placeholder.
 
+
+----- adopt + borrow ( new feature in v0.2.0 !!)
+borrow <python_module>
+  this lets mrrp call real python. like native extensions. yay !!
+  borrow random
+  paw luck = random.randint(1, 6)
+  meow luck
+  borrow math
+  meow math.sqrt(16)
+  meow math.pi
+  you can borrow more than one:
+    borrow math, random
+    borrow random as rnd
+    paw luck = rnd.randint(1, 6)
+  after borrow, both work:
+    random.randint(1, 6)   (qualified, recommended)
+    randint(1, 6)          (unqualified, if no name clash)
+  string toys work too:
+    paw s = "hey"
+    meow s.upper()
+  if the module is missing, cat loses 1 life and keeps going.
+  never crashes.
+
+adopt <name>
+  this is like import in python. it grabs tricks from another .mrrp file.
+  # in math_cat.mrrp:
+  # trick add(a, b) {
+  #   fetch a + b
+  # }
+  # in main.mrrp:
+  adopt math_cat
+  meow add(10, 20)   -> 30
+  rules:
+  - looks for <name>.mrrp next to your script first, then in cat_pack/ or lib/
+  - runs that file with the SAME cat, so its tricks + paws land in your scope
+  - adopting the same file twice is skipped (no infinite zoomies)
+  - missing file = lose 1 life, keep going. never crashes.
+
+cat_pack/ (the standard library folder)
+  this folder sits next to mrrp.py (and next to mrrp.exe in releases).
+  mrrp looks there automatically when you adopt.
+  right now it has:
+  - math.mrrp:    add, sub, pow, abs, sqrt, min, max
+    adopt math
+    meow add(10, 20)
+    meow pow(2, 8)
+  - strings.mrrp: repeat_cat, shout, whisper, reverse_cat, hug
+    adopt strings
+    meow shout("hey cat")
+    meow reverse_cat("mrrp")
+  - games.mrrp:   dice, dice20, coin (uses borrow random inside!)
+    adopt games
+    meow dice()
+    meow coin()
+  try it all at once:
+    python mrrp.py examples/power_pack.mrrp  
+
 --- tiny things ---
 
 yum / yuck

@@ -27,6 +27,10 @@ python mrrp.py
 
 (*I left some examples in /examples, go try them!! mrrrrrrp* )
 
+# *New in v0.2.0!*
+(*The new version for Mrrp "v0.2.0" is released as of 2 oct 2026. enjoy!!)
+- *New "adopt" and "borrow" features (see [usage guide](usage.txt) for more info.)*
+- *Stablized some functions*
 
 -------------------------------------------------------------------------------------------------------------------
 *Built with lots of purrs , tuna for [hackclub ysws](https://crescent.hackclub.com/) :3.*

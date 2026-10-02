@@ -1,0 +1,29 @@
+mrrp
+# strings.mrrp - cat_pack stdlib: text toys
+# use: adopt strings
+# then: meow repeat_cat("ha ", 3) / meow reverse_cat("mrrp") / meow shout("hey")
+borrow builtins
+
+trick repeat_cat(s, n) {
+  paw out = ""
+  zoomies i from 1 to n {
+    out = out + s
+  }
+  fetch out
+}
+
+trick shout(s) {
+  fetch s.upper()
+}
+
+trick whisper(s) {
+  fetch s.lower()
+}
+
+trick reverse_cat(s) {
+  fetch builtins.str.join("", builtins.reversed(builtins.list(s)))
+}
+
+trick hug(a, b) {
+  fetch a + " " + b
+}

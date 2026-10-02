@@ -1,0 +1,33 @@
+mrrp
+# power_pack.mrrp - tests borrow + adopt + cat_pack
+# run: python mrrp.py examples/power_pack.mrrp
+# (no sniff inside, so CI / exe smoke test can run it)
+
+// 1. borrow python directly
+borrow random
+paw luck = random.randint(1, 6)
+meow luck
+
+borrow math
+meow math.sqrt(16)
+meow math.pi
+
+// 2. adopt stdlib tricks
+adopt cat_pack/math
+meow add(10, 20)
+meow pow(2, 8)
+meow sqrt(25)
+meow min(5, 9)
+meow max(5, 9)
+
+adopt strings
+meow shout("hey cat")
+meow whisper("HEY CAT")
+meow reverse_cat("mrrp")
+meow repeat_cat("ha ", 2)
+meow hug("hello", "world")
+
+adopt games
+meow dice()
+meow coin()
+meow dice20()

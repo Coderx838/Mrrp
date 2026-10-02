@@ -14,12 +14,49 @@ import re
 import sys
 import difflib
 
+def _power_stdlib_dirs():
+    import os as _os
+    import sys as _sys
+    dirs = []
+    # 1) PyInstaller bundle temp dir (when --add-data cat_pack is used)
+    try:
+        _bundle = getattr(_sys, "_MEIPASS", None)
+        if _bundle:
+            dirs.append(_os.path.join(_bundle, "cat_pack"))
+            dirs.append(_os.path.join(_bundle, "lib"))
+    except Exception:
+        pass
+    # 2) folder next to the running exe (portable zip / installed exe)
+    try:
+        if getattr(_sys, "frozen", False):
+            _exe_dir = _os.path.dirname(_os.path.abspath(_sys.executable))
+            dirs.append(_os.path.join(_exe_dir, "cat_pack"))
+            dirs.append(_os.path.join(_exe_dir, "lib"))
+    except Exception:
+        pass
+    # 3) folder next to mrrp.py source (normal `python mrrp.py` run)
+    try:
+        _me = _os.path.dirname(_os.path.abspath(__file__))
+        dirs.append(_os.path.join(_me, "cat_pack"))
+        dirs.append(_os.path.join(_me, "lib"))
+    except Exception:
+        pass
+    # de-dupe, keep order
+    _seen = set()
+    _out = []
+    for _d in dirs:
+        if _d and _d not in _seen:
+            _seen.add(_d)
+            _out.append(_d)
+    return _out
+
 KEYWORDS = [
     "mrrp", "meow", "paw", "purr", "hiss", "chase", "zoomies",  # Some custom keywords for the language.
     "trick", "fetch", "sniff", "bury", "dig", "prophecy",
     "flashback", "lives", "nap", "rewind", 
     "from", "to", "step", "will", "be", "is",
-    "and", "or", "yum", "yuck"    # This is logical keywords.
+    "and", "or", "not" ,"yum", "yuck",  # This is logical keywords.
+    "borrow", "adopt",        
 ]
 CAT_EXCUSES = [
     "knocked a vase off the table",
@@ -75,7 +112,7 @@ TOKEN_RE = re.compile(r'''
     (?P<STR>"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')
   | (?P<NUM>\d+\.\d+|\d+)
   | (?P<ID>[A-Za-z_][A-Za-z0-9_\-]*)
-  | (?P<OP>==|!=|<=|>=|[+\-*/%<>=(),!])
+  | (?P<OP>==|!=|<=|>=|[+\-*/%<>=(),!.])
 ''', re.VERBOSE)
 
 def tokenize_expr(s):
@@ -361,6 +398,44 @@ class ExprParser:
             if w in ("and", "or", "not", "is", "will", "be", "from", "to", "step"):
                 self.interp.warn(f"cat found stray word '{w}' in math, using 0")
                 return 0
+            _attrs = []
+            while True:
+                _Kdot , _Vdot = self.peek()
+                if _Kdot == "OP" and _Vdot == ".":
+                    self.next() # consume
+                    _ka, _va = self.peek()
+                    if _ka == "ID":
+                        self.next()
+                        _attrs.append(_va)
+                    else:
+                        self.interp.warn(f"cat expected a name after '.' after '{w}', ignoring '.'")
+                        break
+                else:
+                    break
+            if _attrs:
+                _k3, _w3 = self.peek()
+                if _k3 == "OP" and _w3 == "(":
+                    self.next()
+                    _pargs = []
+                    _kk, _ww = self.peek()
+                    if _kk == "OP" and _ww == ")":
+                        self.next()
+                    else:
+                        while True:
+                            _a = self.parse_or()
+                            _pargs.append(_a)
+                            _kk, _ww = self.peek()
+                            if _kk == "OP" and _ww == ",":
+                                self.next()
+                                continue
+                            if _kk == "OP" and _ww == ")":
+                                self.next()
+                                break
+                            self.interp.warn(f"cat closed missing ')' for python call '{w}." + ".".join(_attrs) + "' with its tail")
+                            break
+                        return self.interp.call_python_dotted(w, _attrs, _pargs)
+                else:
+                    return self.interp.get_python_dotted(w, _attrs)            
             # function call?
             k2, w2 = self.peek()
             if k2 == "OP" and w2 == "(":
@@ -416,6 +491,9 @@ class Interp:
         self.lost = 0
         self.loop_guard = 10000
         self.call_depth = 0
+        self.current_file = None
+        self.adopted = set()
+        self.borrowed_modules = {}
 
     def warn(self, msg):
         print(f"*mrrp* {msg}" , file=sys.stderr)
@@ -525,6 +603,44 @@ class Interp:
                 self.warn(f"cat tilted head... hooman called trick '{name}', cat knows '{m[0]}'")
                 name = m[0]
             else:
+# -----------------------------------------------------------------                            
+                try:
+                    _py = None
+                    _found = False
+                    for _scope in reversed(self.env):
+                        if name in _scope:
+                            _py = _scope[name]
+                            _found = True
+                            break
+                    if not _found and name in self.borrowed_modules:
+                        _py = self.borrowed_modules[name]
+                        _found= True
+                    if _found and callable(_py):
+                        try:
+                            return _py(*args)
+                        except Exception as _e:
+                            self.lose_life(f"python hairball in '{name}(...)' ({_e})")
+                            return 0   
+                    # also try fuzzy python name
+                    if not _found:
+                        try:
+                            _all_py = set()
+                            for _s in self.env:
+                                _all_py.update(_s.keys())
+                            _all_py.update(self.borrowed_modules.keys())
+                            _pm = difflib.get_close_matches(name, list(_all_py), n=1, cutoff=0.78) if _all_py else []
+                            if _pm:
+                                self.warn(f"cat tilted head... hooman called '{name}', cat knows python '{_pm[0]}'")
+                                for _s in reversed(self.env):
+                                    try:
+                                        return _s[_pm[0]](*args)
+                                    except Exception:
+                                        pass
+                        except Exception:
+                            pass
+                except Exception:
+                    pass                 
+# ------------------------------------------------------------------------
                 self.lose_life(f"cat never learned trick '{name}', doing nothing")
                 return 0
         params, body = self.funcs[name]
@@ -713,6 +829,13 @@ class Interp:
                     self.set_var_direct(name, hist[0])
             self.warn("cat rewound time to the very first nap (all toys reset to first value)")
             return
+        if t == "borrow":
+            self.execute_borrow(st.get("modules",[]), st.get("alias", {}))
+            return
+        if t == "adopt":
+            for _mod in st.get("modules",[]):
+                self.execute_adopt(_mod)
+            return
         if t == "expr":
             self.eval_expr(st["expr"])
             return
@@ -724,6 +847,292 @@ class Interp:
                 scope[name] = value
                 return
         self.env[-1][name] = value
+
+    def execute_borrow(self, modules, alias=None):
+        """borrow <python_module>"""
+        import importlib
+        alias = alias or {}
+        for raw in modules:
+            mod_name = (raw or "").strip().strip("\"'").strip()
+            if not mod_name:
+                continue
+        # alias support: caller many pass "random as rnd" already split? handle there too
+            eff_name = mod_name
+            eff_alias = alias.get(mod_name) if isinstance(alias, dict) else None
+            if " as " in mod_name:
+                try:
+                    left, right = [p.strip() for p in mod_name.split(" as ", 1) ]
+                    if left and right:
+                        eff_name, eff_alias = left, right
+                except Exception:
+                    pass
+            if not eff_alias:
+                # default alias = top-level name: "os.path" -> "os"
+                eff_alias = eff_name.split(".")[0] if "." in eff_name else eff_name
+            # validate: python dotted module name
+            import re as _re
+            if not _re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*", eff_name):
+                self.warn(f"cat didn't understand borrow name '{mod_name}', napping it")
+                continue
+            # already borrowed? refresh alias anyway
+            try:
+                mod = importlib.import_module(eff_name)
+            except Exception as e:
+                self.lose_life(f"cat couldn't borrow python '{eff_name}' ({e})")
+                continue
+            # attach module object in Mrrp symbole table (for random.randint)
+            try:
+                self.set_var(eff_alias, mod)
+            except Exception:
+                try:
+                    self.env[-1][eff_alias] = mod
+                except Exception:
+                    pass
+            self.borrowed_modules[eff_alias] = mod
+            # also remember full name if different (os.path -> os.path too)
+            if eff_name != eff_alias:
+                try:
+                    self.env[-1][eff_name.split(".")[0]] = importlib.import_module(eff_name.split(".")[0])
+                except Exception:
+                    pass
+                self.borrowed_modules[eff_name] = mod
+
+            try:
+                known = self.known_names()
+                for attr in dir(mod):
+                    if attr.startswith("_"):
+                        continue
+                    if attr in self.funcs:
+                        continue
+                    if attr in known:
+                        continue
+                    try:
+                        val = getattr(mod, attr)
+                    except Exception:
+                        continue
+                    # only exposes simple value/callable, skips modules to aboid noise
+                    try:
+                        self.env[-1].setdefault(attr, val)
+                    except Exception:
+                        pass        
+            except Exception:
+                pass
+            self.warn(f"cat borrowed python '{eff_name}' as '{eff_alias}' *purr*")
+    def _resolve_python_base(self, base_name):
+        """Return (found_bool, value). Uses get_var but without auto-creating 0 for module"""
+        for scope in reversed(self.env):
+            if base_name in scope:
+                return True, scope[base_name]
+            if base_name in self.borrowed_modules:
+                return True, self.borrowed_modules[base_name]
+            # fall back to normal get_var (has fuzzy + future + auto-create.) It never raises.
+            try:
+                v = self.get_var(base_name)
+                return True,v
+            except Exception:
+                return False, 0
+
+    def get_python_dotted(self, base_name, attrs):
+        """Implements 'math.pi', 's.upper'(no call). never crashes"""
+        try:
+            _, cur = self._resolve_python_base(base_name)
+        except Exception as e:
+            self.lose_life(f"cat couldn't find '{base_name}' for '.{'.'.join(attrs)}' ({e})")
+            return 0 
+        dotted = base_name
+        try:
+            for a in attrs:
+                dotted += "." + a
+                try:
+                    cur = getattr(cur, a)
+                except Exception:
+                    # supports dict-style: cur[a] (for borrowed dicts/json etc. )
+                    try:
+                        cur = cur[a]
+                    except Exception as e2:
+                        self.lose_life(f"cat couldn't reach '{dotted}' ({e2})")
+                        return 0
+            return cur
+        except Exception as e:
+            self.lose_life(f"cat tripped reaching '{dotted}' ({e})")
+            return 0
+        
+    def call_python_dotted(self, base_name, attrs, args):
+        """Implements `random.randint(1,6)`, `s.upper()`, `builtins.str.join(...)`."""
+        try:
+            _, cur = self._resolve_python_base(base_name)
+        except Exception as e:
+            self.lose_life(f"cat couldn't find '{base_name}' for call ({e})")
+            return 0
+        dotted = base_name
+        try:
+            for a in attrs[:-1]:
+                dotted += "." + a
+                try:
+                    cur = getattr(cur, a)
+                except Exception:
+                    try:
+                        cur = cur[a]
+                    except Exception as e2:
+                        self.lose_life(f"cat couldn't reach '{dotted}' ({e2})")
+                        return 0
+            last = attrs[-1] if attrs else ""
+            if last:
+                dotted += "." + last
+                try:
+                    fn = getattr(cur, last)
+                except Exception:
+                    try:
+                        fn = cur[last]
+                    except Exception as e2:
+                        self.lose_life(f"cat couldn't find trick '{dotted}' ({e2})")
+                        return 0
+            else:
+                fn = cur
+            # if fn is not callable but args were given like `x(...)` where x is int? oracle forgive
+            if not callable(fn):
+                # allow `paw x = 5` then `x()`? -> just return value, warn
+                if len(args) == 0:
+                    return fn
+                self.lose_life(f"cat tried to call non-trick '{dotted}' (it's {type(fn).__name__})")
+                return 0
+            try:
+                res = fn(*args)
+            except Exception as e:
+                self.lose_life(f"python hairball in '{dotted}({', '.join([cat_str(a) for a in args])})' ({e})")
+                return 0
+            return res
+        except Exception as e:
+            self.lose_life(f"cat tripped calling '{base_name}.{'.'.join(attrs)}' ({e})")
+            return 0
+
+    def execute_adopt(self, raw_name):
+        """adopt <name> — import-like for .mrrp files. Never crashes (oracle).
+
+        search_paths = [
+            dirname(current_file),  # local folder
+            cwd,
+            dirname(mrrp.py)/cat_pack,  # stdlib folder
+            dirname(mrrp.py)/lib,       # alias stdlib folder
+        ]
+        Executes file with CURRENT interpreter so tricks/paws land in scope.
+        visited set prevents double-import / infinite loops.
+        """
+        import os as _os
+        name = (raw_name or "").strip().strip("\"'").strip()
+        if not name:
+            return
+        # allow `adopt foo.mrrp` or `adopt foo`
+        if name.lower().endswith(".mrrp"):
+            name = name[:-5]
+        # strip any directory bits? keep subpaths: adopt sub/foo allowed
+        if "/" in name or "\\" in name:
+            # path-like adopt: resolve relative to current_file/cwd
+            candidates = []
+            if self.current_file:
+                candidates.append(_os.path.join(_os.path.dirname(_os.path.abspath(self.current_file)), name + ".mrrp"))
+                candidates.append(_os.path.join(_os.path.dirname(_os.path.abspath(self.current_file)), name))
+            candidates.append(_os.path.join(_os.getcwd(), name + ".mrrp"))
+            candidates.append(_os.path.join(_os.getcwd(), name))
+            found = None
+            for c in candidates:
+                if _os.path.isfile(c):
+                    found = c
+                    break
+            if not found:
+                self.lose_life(f"cat couldn't find friend '{raw_name}.mrrp' to adopt")
+                return
+            self._adopt_file(found)
+            return
+        # simple module name
+        import re as _re
+        if not _re.fullmatch(r"[A-Za-z_][A-Za-z0-9_\-]*", name):
+            self.warn(f"cat didn't understand adopt name '{raw_name}', napping it")
+            return
+        search_dirs = []
+        if self.current_file:
+            try:
+                search_dirs.append(_os.path.dirname(_os.path.abspath(self.current_file)))
+            except Exception:
+                pass
+        try:
+            search_dirs.append(_os.getcwd())
+        except Exception:
+            pass
+        
+        # also: cat_pack next to current_file (project-local stdlib)
+        if self.current_file:
+            try:
+                search_dirs.insert(1, _os.path.join(_os.path.dirname(_os.path.abspath(self.current_file)), "cat_pack"))
+                search_dirs.insert(2, _os.path.join(_os.path.dirname(_os.path.abspath(self.current_file)), "lib"))
+            except Exception:
+                pass
+        try:
+            search_dirs.extend(_power_stdlib_dirs())
+        except Exception:
+            try:
+                me_dir = _os.path.dirname(_os.path.abspath(__file__))
+            except Exception:
+                me_dir = _os.getcwd()
+            search_dirs.append(_os.path.join(me_dir, "cat_pack"))
+            search_dirs.append(_os.path.join(me_dir, "lib"))    
+
+
+        found = None
+        for d in search_dirs:
+            for cand in (_os.path.join(d, name + ".mrrp"), _os.path.join(d, name)):
+                try:
+                    if _os.path.isfile(cand):
+                        found = cand
+                        break
+                except Exception:
+                    continue
+            if found:
+                break
+        if not found:
+            self.lose_life(f"cat couldn't find friend '{name}.mrrp' to adopt (looked in {search_dirs})")
+            return
+        self._adopt_file(found)
+
+    def _adopt_file(self, abspath):
+        import os as _os
+        try:
+            key = _os.path.abspath(abspath)
+        except Exception:
+            key = abspath
+        if key in self.adopted:
+            self.warn(f"cat already adopted '{_os.path.basename(key)}', skipping (no infinite zoomies)")
+            return
+        self.adopted.add(key)
+        try:
+            with open(key, "r", encoding="utf-8") as f:
+                src = f.read()
+        except Exception as e:
+            self.lose_life(f"cat couldn't read adopted file '{key}' ({e})")
+            return
+        old_file = self.current_file
+        self.current_file = key
+        self.warn(f"cat adopted '{_os.path.basename(key)}' *happy purr*")
+        try:
+            lines = preprocess(src, self)
+            prescan(lines, self)
+            parser = StmtParser(lines, self)
+            prog = parser.parse_program()
+            try:
+                opens = sum(1 for L in lines if L.strip().endswith("{"))
+                closes = sum(1 for L in lines if L.strip() == "}")
+                if opens > closes:
+                    self.warn(f"cat closed {opens-closes} missing '}}' with its tail (in {key})")
+            except Exception:
+                pass
+            self.exec_block(prog)
+        except CatReturn:
+            # fetch as top -level of adopted file? just ignore , restore file
+            pass
+        except Exception as e:
+            self.lose_life(f"adopted file '{key}' had a hairball ({e})")
+        finally:
+            self.current_file = old_file               
 
 
 # ---------------------------- source preprocessing ----------------------------- #
@@ -1032,6 +1441,48 @@ class StmtParser:
             return {"type": "lives"}
         if line == "rewind":
             return {"type": "rewind"}
+## --------------------------------------------------------------------
+        _m = re.match(r"^borrow\s+(.+?)\s*\{?\s*$", line)
+        if _m or line.strip() == "borrow":
+            _rest = _m.group(1).strip() if _m else ""
+            _rest = _rest.rstrip("{").strip()
+            _mods = []
+            if _rest == "":
+                self.interp.warn("cat didn't see what to borrow, napping")
+            else:
+                # split by comma, keep `X as Y` together, else split spaces
+                for _chunk in _rest.split(","):
+                    _chunk = _chunk.strip()
+                    if not _chunk:
+                        continue
+                    if " as " in _chunk:
+                        _mods.append(_chunk)
+                    else:
+                        for _p in _chunk.split():
+                            _p = _p.strip().strip("\"'").strip()
+                            if _p and _p not in ("{", "}"):
+                                _mods.append(_p)
+            return {"type": "borrow", "modules": _mods, "alias": {}}
+        # adopt <name> [, more]  e.g. adopt math_cat / adopt math, strings
+        _m2 = re.match(r"^adopt\s+(.+?)\s*\{?\s*$", line)
+        if _m2 or line.strip() == "adopt":
+            _rest2 = _m2.group(1).strip() if _m2 else ""
+            _rest2 = _rest2.rstrip("{").strip()
+            _mods2 = []
+            if _rest2 == "":
+                self.interp.warn("cat didn't see who to adopt, napping")
+            else:
+                for _chunk in _rest2.split(","):
+                    _chunk = _chunk.strip()
+                    if not _chunk:
+                        continue
+                    for _p in _chunk.split():
+                        _p = _p.strip().strip("\"'").strip()
+                        if _p and _p not in ("{", "}"):
+                            # allow `adopt foo.mrrp`
+                            _mods2.append(_p)
+            return {"type": "adopt", "modules": _mods2}
+## ----------------------------------------------------------------------------------------        
         # prophecy set: prophecy NAME will be EXPR
         m = re.match(r"^prophecy\s+([A-Za-z_][A-Za-z0-9_\-]*)\s+will\s+be\s*(.*)$", line)
         if m:
@@ -1171,9 +1622,20 @@ class StmtParser:
         return {"type": "expr", "expr": line}
 
 
-def run_source(source, interp=None):
+def run_source(source, interp=None, filename=None):
     if interp is None:
         interp = Interp()
+    # ---------- [POWER PACK] track current file ----------
+    import os as _os
+    _old_file = interp.current_file
+    if filename:
+        try:
+            interp.current_file = _os.path.abspath(filename)
+            # prevent `adopt self` infinite loop: mark main file as adopted
+            interp.adopted.add(_os.path.abspath(filename))
+        except Exception:
+            interp.current_file = filename
+    # --------------------
     lines = preprocess(source, interp)
     prescan(lines, interp)
     parser = StmtParser(lines, interp)
@@ -1186,6 +1648,9 @@ def run_source(source, interp=None):
     if opens > closes:
         interp.warn(f"cat closed {opens-closes} missing '}}' with its tail")
     interp.exec_block(prog)
+    # restore (for REPL snippets filename=None keeps old file)
+    if filename:
+        interp.current_file = _old_file
     return interp
 
 # yay ! we are to main yeh mrrrrp
@@ -1229,8 +1694,8 @@ def main():
         print(f"cat couldn't find file '{path}' ({e})", file=sys.stderr)
         sys.exit(1)
     interp = Interp()
-    try:
-        run_source(src, interp)
+    try:        
+        run_source(src, interp, filename=path) # for new features ... yay!
     except CatReturn:
         pass
     except RecursionError:

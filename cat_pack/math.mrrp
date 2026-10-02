@@ -1,0 +1,51 @@
+mrrp
+# math.mrrp - cat_pack stblib: tiny math tricks
+# usage : adopt math
+# then : meow add(10,20) / meow pow(2,8) / meow sqrt(16)
+barrow math
+
+trick add(a,b){
+    fetch a + b
+}
+
+trick sub(a,b){
+    fetch a - b 
+}
+
+trick pow(a,b){
+    fetch math.pow(a,b)
+}
+
+trick abs(x){
+    purr x < 0{
+        fetch 0 - x
+    }
+    hiss {
+        fetch x
+    }
+}
+
+trick sqrt(x){
+    purr x <= 0{
+        fetch 0
+    }
+    fetch math.sqrt(x)
+}
+
+trick min(a,b){
+    purr a < b{
+        fetch a
+    }
+    hiss {
+        fetch b
+    }
+}
+
+trick max(a,b){
+    purr a > b {
+        fetch a
+    }
+    hiss {
+        fetch b
+    }
+}

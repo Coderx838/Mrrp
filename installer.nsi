@@ -25,7 +25,6 @@ ShowUnInstDetails show
 !include "StrFunc.nsh"
 ${StrStr}
 ${StrRep}
-${UnStrRep}
 
 !define MUI_ABORTWARNING
 !insertmacro MUI_PAGE_WELCOME
@@ -47,6 +46,15 @@ Section "Mrrp (required)" SEC_MAIN
   File "examples\hello.mrrp"
   File "examples\hello_world.mrrp"
   File "examples\fibonacci.mrrp"
+  File "examples\cat_day.mrrp"
+  File "examples\nine_lives.mrrp"
+  File "examples\time_travel.mrrp"
+  File "examples\power_pack.mrrp"
+  ; cat_pack stdlib so `adopt math/strings/games` works from exe too
+  SetOutPath "$INSTDIR\cat_pack"
+  File "cat_pack\math.mrrp"
+  File "cat_pack\strings.mrrp"
+  File "cat_pack\games.mrrp"
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "Software\Mrrp" "InstallDir" "$INSTDIR"
@@ -80,7 +88,15 @@ Section "Uninstall"
   Delete "$INSTDIR\examples\hello.mrrp"
   Delete "$INSTDIR\examples\hello_world.mrrp"
   Delete "$INSTDIR\examples\fibonacci.mrrp"
+  Delete "$INSTDIR\examples\cat_day.mrrp"
+  Delete "$INSTDIR\examples\nine_lives.mrrp"
+  Delete "$INSTDIR\examples\time_travel.mrrp"
+  Delete "$INSTDIR\examples\power_pack.mrrp"
   RMDir "$INSTDIR\examples"
+  Delete "$INSTDIR\cat_pack\math.mrrp"
+  Delete "$INSTDIR\cat_pack\strings.mrrp"
+  Delete "$INSTDIR\cat_pack\games.mrrp"
+  RMDir "$INSTDIR\cat_pack"
   Delete "$SMPROGRAMS\Mrrp\Mrrp.lnk"
   Delete "$SMPROGRAMS\Mrrp\Uninstall.lnk"
   RMDir "$SMPROGRAMS\Mrrp"
@@ -91,9 +107,9 @@ Section "Uninstall"
 
   ; Best-effort PATH cleanup: "$INSTDIR;" -> "" then ";$INSTDIR" -> "" then "$INSTDIR" -> ""
   ReadRegStr $0 HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "Path"
-  ${UnStrRep} $1 "$0" "$INSTDIR;" ""
-  ${UnStrRep} $2 "$1" ";$INSTDIR" ""
-  ${UnStrRep} $3 "$2" "$INSTDIR" ""
+  ${StrRep} $1 "$0" "$INSTDIR;" ""
+  ${StrRep} $2 "$1" ";$INSTDIR" ""
+  ${StrRep} $3 "$2" "$INSTDIR" ""
   WriteRegExpandStr HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "Path" "$3"
   SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
 SectionEnd
